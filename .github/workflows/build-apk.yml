@@ -1,4 +1,4 @@
-name: Build ZangYar APK
+
 
 on:
   workflow_dispatch:
