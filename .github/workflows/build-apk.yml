@@ -1,36 +1,57 @@
-
+name: Build ZangYar APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract ZangYar project
+      - name: Extract ZangYar project
         run: |
           mkdir build-project
+
           ZIP=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
-          echo "Using: $ZIP"
+
+          if [ -z "$ZIP" ]; then
+            echo "ZIP project not found"
+            exit 1
+          fi
+
+          echo "Using ZIP: $ZIP"
           unzip -q "$ZIP" -d build-project
 
-          PROJECT=$(find build-project -name settings.gradle.kts -type f | head -n 1 | xargs dirname)
-          echo "Project directory: $PROJECT"
+          echo "Searching for Android project..."
+
+          PROJECT=$(find build-project -type f \( \
+            -name "settings.gradle" \
+            -o -name "settings.gradle.kts" \
+          \) | head -n 1 | xargs dirname)
+
+          if [ -z "$PROJECT" ]; then
+            echo "Android Gradle project not found"
+            find build-project -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+
+          echo "Project found at: $PROJECT"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Set up Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK
@@ -41,12 +62,12 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Set up Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      - name: Build APK
+      - name: Build Debug APK
         run: |
           gradle -p "$PROJECT" assembleDebug --stacktrace
 
